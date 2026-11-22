@@ -8,9 +8,11 @@
   import { api } from '../api';
   import type { Detection, Sensor } from '../types';
   import DetectionBoxes from './DetectionBoxes.svelte';
+  import ExtraRegionOutline from './ExtraRegionOutline.svelte';
   import RoiEditor from './RoiEditor.svelte';
   import TeachableFrame from './TeachableFrame.svelte';
   import { objectKeys } from '../objects';
+  import { extraRegionOf } from '../reading';
 
   let {
     sensor,
@@ -87,12 +89,17 @@
     if (last) setTimeout(() => URL.revokeObjectURL(last), 1000);
   });
   const teachOn = $derived(boxesFrame ?? shownFrame ?? fallbackFrame);
+  // A reading sensor's box of smaller digits, read beside its region.
+  const extra = $derived(sensor.reading ? extraRegionOf(sensor.reading) : null);
 </script>
 
 {#if teach}
   <TeachableFrame {sensor} {src} {detections} source={teachOn ? { frame_id: teachOn } : null} bind:busy {onchange} />
 {:else}
   <RoiEditor {src} roi={sensor.roi}>
+    {#snippet overlay()}
+      {#if extra}<ExtraRegionOutline roi={sensor.roi} region={extra} straightened={!!sensor.reading?.straighten} />{/if}
+    {/snippet}
     <DetectionBoxes {detections} classes={objectKeys(sensor)} own={sensor.objects?.custom ?? []} {labels} />
   </RoiEditor>
 {/if}

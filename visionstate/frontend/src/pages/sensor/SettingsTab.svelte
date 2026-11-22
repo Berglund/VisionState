@@ -8,6 +8,7 @@
   import ConfirmButton from '../../lib/components/ConfirmButton.svelte';
   import DialsEditor from '../../lib/components/DialsEditor.svelte';
   import ExtraRegionEditor from '../../lib/components/ExtraRegionEditor.svelte';
+  import ExtraRegionOutline from '../../lib/components/ExtraRegionOutline.svelte';
   import RegionButtons from '../../lib/components/RegionButtons.svelte';
   import Icon from '../../lib/components/Icon.svelte';
   import LightEditor from '../../lib/components/LightEditor.svelte';
@@ -30,7 +31,7 @@
   import TeachLimitsEditor from '../../lib/components/TeachLimitsEditor.svelte';
   import TriggersEditor from '../../lib/components/TriggersEditor.svelte';
   import { isObjectSensor, objectName, objectPicker } from '../../lib/objects';
-  import { canExtraRegion, dialCount, isReadingSensor, readingUnit, valueDecimals } from '../../lib/reading';
+  import { canExtraRegion, dialCount, extraRegionOf, isReadingSensor, readingUnit, valueDecimals } from '../../lib/reading';
   import { toPoints, toRectangle } from '../../lib/roi';
   import { go, href, paths } from '../../lib/router.svelte';
   import { isSoundSensor } from '../../lib/sound';
@@ -361,6 +362,7 @@
           >
             {#snippet overlay()}
               {#if readingSensor && reading.display === 'counter'}<DigitCells {roi} digits={reading.digits} whole={reading.counter_reader === 'wheels'} {straightened} />{/if}
+              {#if readingSensor && extraRegionOf(reading)}<ExtraRegionOutline {roi} region={extraRegionOf(reading)!} {straightened} />{/if}
             {/snippet}
           </LiveFrame>
         </div>
