@@ -37,6 +37,7 @@ from ..settings import (
     KIND_STATES,
     SOUND,
     VERSION,
+    extra_region,
     plates_on,
 )
 from ..sounds import MODELS as SOUND_MODELS
@@ -529,9 +530,17 @@ class BenchmarkMixin(ChecksMixin):
 
             return wheels_in
         reader = readers.Reader(spec, path)
-        return lambda image: reader.read_display(
-            imaging.region_image(image, cfg.roi, straightened), reading["display"], int(reading["digits"])
-        )
+        box = extra_region(reading)
+
+        def display_in(image: Image.Image) -> None:  # with its extra region, as models.read_number reads it
+            reader.read_display(
+                imaging.region_image(image, cfg.roi, straightened), reading["display"], int(reading["digits"])
+            )
+            cut = imaging.extra_region_image(image, cfg.roi, box, straightened) if box else None
+            if cut is not None:
+                reader.read_display(cut, reading["display"])
+
+        return display_in
 
     @staticmethod
     def _sound_model_of(spec, path: Path):  # noqa: ANN001, ANN205 - imported here like the sound part does

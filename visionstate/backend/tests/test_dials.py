@@ -510,9 +510,11 @@ def test_a_meter_with_pointer_dials(settings):
         assert client.post("/api/v1/preview/read", json={**preview, "reading": many}).status_code == 422
         far = {**reading, "dials": [{"x": 0, "y": READING["dial_reach"] + 2, "r": 0.5}]}
         assert client.post("/api/v1/preview/read", json={**preview, "reading": far}).status_code == 422
-        # Other displays have no meter face.
-        lcd = client.post("/api/v1/preview/read", json={**preview, "reading": {"display": "lcd"}}).json()
-        assert "face" not in lcd
+        # A counter read as text and a turning dial have no meter face (displays have one: extra regions).
+        ocr = client.post("/api/v1/preview/read", json={**preview, "reading": {**reading, "counter_reader": "ocr"}})
+        assert "face" not in ocr.json()
+        dial = client.post("/api/v1/preview/read", json={**preview, "reading": {"display": "dial", "mode": "flow"}})
+        assert "face" not in dial.json()
 
         # A sensor: its value, History and the readings export carry the dials.
         body = {"name": "Water", "kind": "reading", "source_type": "http", "source": "http://fake", "roi": camera.roi}

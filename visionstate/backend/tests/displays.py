@@ -184,6 +184,35 @@ def render(text: str, style: str = "lcd", digit_height: int = 120, margin: int =
     return image
 
 
+def render_split(big: str, small: str, style: str = "lcd") -> tuple[Image.Image, dict, dict]:
+    """A display whose last digits are smaller and beside the others, at their top (a water meter's
+    m³ and litres: "00957" and "727"). Returns the picture, a region round the big digits (normalised)
+    and an extra region round the small ones (settings.READING_DEFAULTS["extra_region"])."""
+    height, small_height, margin, pad = 120, 60, 40, 14
+    left = render(big, style, height, margin)
+    right = render(small, style, small_height, pad)
+    background = STYLES[style][0]
+    width = left.width - margin + 16 + right.width
+    image = Image.new("RGB", (width, left.height), background)
+    image.paste(left, (0, 0))
+    sx = left.width - margin + 16  # where the small picture starts (its own pad included)
+    image.paste(right, (sx, margin - pad))
+    gap = height * 0.18
+    x0, y0 = margin - pad, margin - pad
+    x1 = margin + len(big) * (height * 0.55 + gap) - gap + pad
+    unit = height + 2 * pad  # the region's height in pixels
+    roi = {"x": x0 / width, "y": y0 / image.height, "w": (x1 - x0) / width, "h": unit / image.height}
+    small_x1 = sx + right.width - pad - gap + pad / 2
+    extra = {
+        "x": round((sx + pad / 2 - x0) / unit, 4),
+        "y": round((margin - pad - y0) / unit, 4),
+        "w": round((small_x1 - sx - pad / 2) / unit, 4),
+        "h": round((small_height + 2 * pad) / unit, 4),
+        "digits": len(small),
+    }
+    return image, roi, extra
+
+
 # --- Pointer dials (docs/POINTER_DIAL_PLAN.md) -----------------------------------------------------
 
 DIAL_SPOTS = ((130, 520), (330, 650), (560, 650), (690, 465))  # centres of up to four dials below the counter

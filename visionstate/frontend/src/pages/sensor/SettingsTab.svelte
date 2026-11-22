@@ -6,8 +6,8 @@
   import CameraOrientation from '../../lib/components/CameraOrientation.svelte';
   import CameraSettingsEditor from '../../lib/components/CameraSettingsEditor.svelte';
   import ConfirmButton from '../../lib/components/ConfirmButton.svelte';
-  import CounterDialsSwitch from '../../lib/components/CounterDialsSwitch.svelte';
   import DialsEditor from '../../lib/components/DialsEditor.svelte';
+  import ExtraRegionEditor from '../../lib/components/ExtraRegionEditor.svelte';
   import RegionButtons from '../../lib/components/RegionButtons.svelte';
   import Icon from '../../lib/components/Icon.svelte';
   import LightEditor from '../../lib/components/LightEditor.svelte';
@@ -20,6 +20,7 @@
   import PlatesCard from '../../lib/components/PlatesCard.svelte';
   import ReadingEditor from '../../lib/components/ReadingEditor.svelte';
   import ReadingParams from '../../lib/components/ReadingParams.svelte';
+  import ReadingPartSwitch from '../../lib/components/ReadingPartSwitch.svelte';
   import ReviewRulesEditor from '../../lib/components/ReviewRulesEditor.svelte';
   import SensorParams from '../../lib/components/SensorParams.svelte';
   import SoundEditor from '../../lib/components/sound/SoundEditor.svelte';
@@ -29,7 +30,7 @@
   import TeachLimitsEditor from '../../lib/components/TeachLimitsEditor.svelte';
   import TriggersEditor from '../../lib/components/TriggersEditor.svelte';
   import { isObjectSensor, objectName, objectPicker } from '../../lib/objects';
-  import { extraDigits, isReadingSensor, readingUnit, valueDecimals } from '../../lib/reading';
+  import { canExtraRegion, dialCount, isReadingSensor, readingUnit, valueDecimals } from '../../lib/reading';
   import { toPoints, toRectangle } from '../../lib/roi';
   import { go, href, paths } from '../../lib/router.svelte';
   import { isSoundSensor } from '../../lib/sound';
@@ -117,11 +118,13 @@
   $effect(() => {
     if (straightened && roi && toPoints(roi).length > 4) roi = toRectangle(roi);
   });
-  // A counter read by a wheel reader: its pointer dials, placed on a fresh frame's meter face (read with
-  // the settings being edited, so it shows what they would read).
+  // A counter read by a wheel reader: its pointer dials; a display: its box of smaller digits. Both are
+  // placed on a fresh frame's meter face (read with the settings being edited, so it shows what they
+  // would read).
   const canDial = $derived(readingSensor && reading.display === 'counter' && reading.counter_reader === 'wheels');
-  let editing = $state<'counter' | 'dials'>('counter');
-  const editingDials = $derived(canDial && editing === 'dials');
+  const canExtra = $derived(readingSensor && canExtraRegion(reading));
+  let editing = $state<'region' | 'extra'>('region');
+  const editingExtra = $derived((canDial || canExtra) && editing === 'extra');
   let dialPreview = $state<ReadPreview | null>(null);
   let dialBusy = $state(false);
   let dialError = $state('');
@@ -138,7 +141,7 @@
   }
   // Each time the picture turns to the dials: the region may have changed since.
   $effect(() => {
-    if (editingDials) untrack(readDials);
+    if (editingExtra) untrack(readDials);
   });
   const labels = $derived(SETTINGS_SECTION_LABELS[sensor.kind]);
   const sections = $derived(SETTINGS_SECTIONS.filter((id) => labels[id]));
@@ -291,7 +294,7 @@
         <div class="card-title">
           <span></span>
           <span class="row wrap region-actions" style="gap:8px">
-            {#if editingDials}
+            {#if editingExtra}
               <button class="btn sm" onclick={readDials} disabled={dialBusy}>
                 <Icon name="refresh" size={14} /> {dialBusy ? 'Reading…' : 'Read now'}
               </button>
@@ -300,8 +303,21 @@
             {/if}
           </span>
         </div>
-        {#if canDial}<CounterDialsSwitch bind:editing dials={reading.dials.length} />{/if}
-        {#if editingDials}
+        {#if canDial}<ReadingPartSwitch bind:editing kind="dials" count={reading.dials.length} />{/if}
+        {#if canExtra}<ReadingPartSwitch bind:editing kind="digits" count={reading.extra_region?.digits ?? 0} />{/if}
+        {#if editingExtra && canExtra}
+          <div class="col" data-testid="extra-region-card">
+            <p class="small muted">
+              Smaller digits beside the others (the litres after a water meter's m³): read on their own, each one more
+              decimal. The display is straightened the way it is read.
+            </p>
+            {#if dialError}<p class="notice danger small">{dialError}</p>{/if}
+            <ExtraRegionEditor preview={dialPreview} bind:region={reading.extra_region} decimals={reading.decimals} />
+            {#if dialPreview?.value}
+              <span class="small">Read <strong class="mono">{dialPreview.value}</strong></span>
+            {/if}
+          </div>
+        {:else if editingExtra}
           <div class="col" data-testid="dials-card">
             <p class="small muted">
               The small dials beside the wheels (×0.1, ×0.01 …): each one more digit, read with the wheels. The face is
@@ -438,7 +454,7 @@
           mode={reading.mode}
           unit={reading.unit}
           decimals={valueDecimals(reading)}
-          hasDials={extraDigits(reading) > 0}
+          hasDials={dialCount(reading) > 0}
           intervalS={interval_s}
         />
       {:else}

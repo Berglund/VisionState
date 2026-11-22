@@ -38,7 +38,7 @@ export const REJECT_REASONS: Record<string, string> = {
   unsure: 'the reader was unsure',
   'went down': 'a counter can not go down',
   'changed too much': 'it changed more than allowed',
-  'wrong digit count': 'not the number of digits the counter has',
+  'wrong digit count': 'not the number of digits the counter or the small digits have',
   'camera changed': "the camera's picture changed size",
   jumped: 'the needle jumped, and the next reading did not confirm it',
   'too fast': 'the needle moved too far between two readings to count',
@@ -77,6 +77,9 @@ export const readingDetail = (p: Prediction) =>
     last_seen?: string;
     /** The pointer dials it was read with. */
     dials?: unknown[];
+    /** The extra region it was read with, and what that read on its own. */
+    extra_region?: unknown;
+    extra?: { text: string; score: number };
   };
 
 /** "Read the same 3 more times, last …" for a rejected reading that came again, or null. */
@@ -92,15 +95,18 @@ export function readingRoi(p: Prediction, sensor: Pick<Sensor, 'roi'>): Roi | nu
   return detail.roi !== undefined ? detail.roi : sensor.roi;
 }
 
+/** The reading settings that say where a value's decimal point goes. */
+export type DecimalSettings = Pick<
+  ReadingSettings,
+  'mode' | 'decimals' | 'display' | 'counter_reader' | 'dials' | 'extra_region'
+>;
+
 /**
  * What a value typed as the right one is saved as, or null when it is not a number. Mirrors
  * readers.right_value + format_value in the backend: with a point or comma as written, digits only
  * the way the meter shows them ("0629558" with 3 decimals → "629.558"), time left as minutes or h:mm.
  */
-export function rightValue(
-  text: string,
-  settings: Pick<ReadingSettings, 'mode' | 'decimals' | 'display' | 'counter_reader' | 'dials'>,
-): string | null {
+export function rightValue(text: string, settings: DecimalSettings): string | null {
   const decimals = valueDecimals(settings);
   const t = text.trim();
   if (!t) return null;
@@ -113,19 +119,25 @@ export function rightValue(
   return Number.isFinite(n) ? n.toFixed(decimals) : null;
 }
 
-/** Digits a counter read by a wheel reader reads beyond its wheels: one per pointer dial
- * (settings.extra_digits). */
-export function extraDigits(
-  settings: Pick<ReadingSettings, 'display' | 'counter_reader' | 'dials'>,
-): number {
-  if (settings.display !== 'counter' || settings.counter_reader !== 'wheels') return 0;
-  return settings.dials?.length ?? 0;
+/** Whether a display and mode read an extra region (settings.EXTRA_REGION_DISPLAYS, EXTRA_REGION_MODES). */
+export const canExtraRegion = (settings: Pick<ReadingSettings, 'mode' | 'display'>): boolean =>
+  !!app.config?.extra_region_displays.includes(settings.display) && !!app.config?.extra_region_modes.includes(settings.mode);
+
+/** The extra region a sensor reads (settings.extra_region): none with another display or mode. */
+export const extraRegionOf = (settings: Pick<ReadingSettings, 'mode' | 'display' | 'extra_region'>) =>
+  settings.extra_region && canExtraRegion(settings) ? settings.extra_region : null;
+
+/** The pointer dials a sensor reads: only a counter read by a wheel reader (settings.dial_count). */
+export const dialCount = (settings: Pick<ReadingSettings, 'display' | 'counter_reader' | 'dials'>): number =>
+  settings.display === 'counter' && settings.counter_reader === 'wheels' ? (settings.dials?.length ?? 0) : 0;
+
+/** Digits read beyond the region: one per pointer dial, or the extra region's (settings.extra_digits). */
+export function extraDigits(settings: Omit<DecimalSettings, 'decimals'>): number {
+  return extraRegionOf(settings)?.digits ?? dialCount(settings);
 }
 
-/** Decimals of the value: the counter's own and its extra digits (settings.value_decimals). */
-export const valueDecimals = (
-  settings: Pick<ReadingSettings, 'decimals' | 'display' | 'counter_reader' | 'dials'>,
-) => settings.decimals + extraDigits(settings);
+/** Decimals of the value: the sensor's own and its extra digits (settings.value_decimals). */
+export const valueDecimals = (settings: DecimalSettings) => settings.decimals + extraDigits(settings);
 
 /** Share as a percentage with one decimal ("2.4 %"), or "—" without readings. */
 export const rate = (part: number, whole: number) => (whole ? `${((part / whole) * 100).toFixed(1)} %` : '—');

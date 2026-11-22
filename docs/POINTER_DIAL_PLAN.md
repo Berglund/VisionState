@@ -175,7 +175,7 @@ carry the dials (a format version more).
 **Interface** (`DialsEditor.svelte`, on the meter face `POST /preview/read` returns: `face`,
 `face_box`, `region_width`, and each dial's needle).
 - Wizard and Settings: a mechanical counter read by the wheel reader gets *Edit: Counter | Dials*
-  (`CounterDialsSwitch.svelte`) above the picture; *Counter* is the region editor, *Dials* the dial
+  (`ReadingPartSwitch.svelte`) above the picture; *Counter* is the region editor, *Dials* the dial
   editor, with the hint *Has the meter pointer dials?* while there are none.
 - *Dials* in Settings reads a fresh frame with the settings being edited each time it opens, and at
   *Read now*. *Add dial* puts a circle beside the last one (the first below the counter), labelled with its

@@ -29,7 +29,7 @@ from PIL import Image, ImageFilter, ImageOps
 
 from . import dials
 from .backbones import Footprint, cpu_session
-from .settings import READING, extra_digits, value_decimals
+from .settings import READING, dial_count, extra_digits, extra_region, value_decimals
 
 REGISTRY_FILE = Path(__file__).with_name("readers.json")
 MAX_WIDTH = 1600  # widest input (pixels at height 48); longer numbers are squeezed
@@ -687,7 +687,7 @@ def settle_turning_wheel(text: Text, last: float | None, settings: dict) -> Text
     wheel gets there early, and 8.99 on one whose wheel stands on its digit until the dial is round.
     Without a last value the reading stays, as unsure (READING["dial_wheel_undecided_score"]).
     """
-    extra = extra_digits(settings)
+    extra = dial_count(settings)
     found = text.details or {}
     wheels = found.get("wheels")
     if not extra or not wheels or not text.text.isdigit():
@@ -766,9 +766,14 @@ def digit_count(text: str) -> int:
     return len(re.sub(r"\D", "", text))
 
 
-def wrong_digit_count(text: str, settings: dict) -> bool:
+def wrong_digit_count(text: str, settings: dict, details: dict | None = None) -> bool:
     """A mechanical counter always shows all its wheels (and reads its extra digits): any other
-    number of digits is a misread."""
+    number of digits is a misread. So is an extra region (settings.extra_region) read with another
+    number of digits than it has (what it read: ``details["extra"]``, models.read_number): its digits
+    are the value's last ones, so one missed would shift every digit before it."""
+    if (region := extra_region(settings)) is not None:
+        extra = (details or {}).get("extra")
+        return extra is not None and digit_count(extra["text"]) != int(region["digits"])
     return settings["display"] == "counter" and digit_count(text) != int(settings["digits"]) + extra_digits(settings)
 
 
@@ -796,14 +801,14 @@ def settling(value: float | None, last: float | None, settings: dict) -> bool:
     A wheel between two digits is read as the one or the other; once the higher one was published,
     every right reading until the counter gets there is one step lower. Such a reading keeps the
     value without counting as rejected, so it neither floods the review queue nor the statistics.
-    One step of its last digit; with extra digits (pointer dials), whose
+    One step of its last digit; with pointer dials, whose
     last digit jitters, up to ``READING["settle_steps_fine"]`` steps.
     """
     if settings["mode"] != "counter" or value is None or last is None:
         return False
     step = 10 ** -value_decimals(settings)
     steps = (last - value) / step
-    most = READING["settle_steps_fine"] if extra_digits(settings) else 1
+    most = READING["settle_steps_fine"] if dial_count(settings) else 1
     return 1 - 1e-3 < steps < most + 1e-3
 
 

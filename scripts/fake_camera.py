@@ -7,6 +7,9 @@ GET /set?state=open|closed|partial   changes what the camera shows
 GET /set?night=1                 switches to a greyscale "IR" image
 GET /photo/<name>.jpg            a real photo from visionstate/backend/tests/assets (for object sensors)
 GET /display.jpg?text=12.5&style=lcd|led   a drawn seven-segment display (for reading sensors)
+GET /split.jpg?big=00957&small=727&turn=12   a drawn display whose last digits are smaller and beside the
+                                 others (a water meter's litres); /split-region.json gives its region (round the
+                                 big digits) and its extra region as a reading sensor stores them
 GET /plate.jpg?text=VS 12345     a real car (CC0 photo) with that licence plate drawn on it (plate reading)
 GET /counter.jpg?value=89939.5&digits=7&decimals=3   a drawn mechanical counter with rolling digits
                                  (value = the number on the wheels; .5 = last wheel half way);
@@ -55,6 +58,7 @@ from displays import (  # noqa: E402  (shared with the backend tests)
     car_with_plate,
     counter_box,
     render_counter,
+    render_split,
     render_test_dial,
     turned,
     turned_meter,
@@ -73,6 +77,7 @@ def sound_source():  # noqa: ANN201
 
             SOUND = SoundSource()
         return SOUND
+
 
 STATE = {"state": "closed", "night": False}
 WIDER: dict[str, int] = {}  # counter.jpg's "camera" -> pixels added on the right
@@ -103,6 +108,7 @@ def render() -> bytes:
 # a snapshot asks for something).
 ESP32_SETTINGS = ("size", "quality", "clock", "exposure", "gain", "ae")
 ESP32 = dict.fromkeys(ESP32_SETTINGS, "unknown")
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):  # keep test output quiet
@@ -142,7 +148,7 @@ class Handler(BaseHTTPRequestHandler):
             source = sound_source()
             try:
                 source.send_wav(self.wfile) if url.path == "/sound.wav" else source.send_camera(self.wfile)
-            except (BrokenPipeError, ConnectionResetError):
+            except BrokenPipeError, ConnectionResetError:
                 pass
             return
         if url.path == "/play":
@@ -178,6 +184,24 @@ class Handler(BaseHTTPRequestHandler):
             style = query.get("style", ["lcd"])[0]
             buf = io.BytesIO()
             render_display(text, style if style in STYLES else "lcd").save(buf, format="JPEG", quality=90)
+            self._send(buf.getvalue(), "image/jpeg")
+        elif url.path in ("/split.jpg", "/split-region.json"):
+            query = parse_qs(url.query)
+            big = "".join(c for c in query.get("big", ["00957"])[0] if c.isdigit())[:10] or "0"
+            small = "".join(c for c in query.get("small", ["727"])[0] if c.isdigit())[:6] or "0"
+            try:
+                turn = float(query.get("turn", ["0"])[0])
+            except ValueError:
+                self.send_error(400)
+                return
+            image, region, extra = render_split(big, small)
+            if turn:  # turned only: the extra region was measured on the drawing (a tilt would stretch it)
+                image, region = turned(image, turn, region)
+            if url.path == "/split-region.json":
+                self._send(json.dumps({"region": region, "extra_region": extra}).encode(), "application/json")
+                return
+            buf = io.BytesIO()
+            image.save(buf, format="JPEG", quality=90)
             self._send(buf.getvalue(), "image/jpeg")
         elif url.path == "/counter.jpg":
             query = parse_qs(url.query)

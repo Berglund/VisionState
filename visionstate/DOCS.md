@@ -518,6 +518,20 @@ each needle was found, or *No needle found*. The review queue and the Quality ta
 picture for each stored reading, so the dials' digits can be checked too. A dial needs a few dozen pixels across in the picture
 to be read: move the camera closer, or use its zoom, if the dials are tiny.
 
+**Smaller digits beside the others** — some displays show their last digits smaller, next to the
+big ones: a water meter's LCD with whole m³ in big digits and the litres small at their top right
+("00957" and "727" is 957.727 m³). One region over both often reads poorly — a small digit dropped
+or taken for part of the big ones. Draw the region round the **big digits only**, then switch the
+picture to **Edit: Small digits** (digital displays, counters and values). The display is shown
+straightened the way it is read (the dashed box is the region): **Add a box**, drag it onto the
+small digits with a little room around them and its handle to size it, and set how many **digits**
+it shows. They are read on their own and added after the region's digits, each one more decimal,
+so leave *Digits after the decimal point* at what the big digits show (0 for whole m³). The box
+moves and straightens with the region. A reading whose box shows another number of digits than set
+is rejected (*wrong digit count*) rather than shifting every digit before it, and the reading is
+only as sure as the less sure of the two. *What the reader sees* shows the digits, then the small
+digits; the review queue and the Quality tab show the same picture for each stored reading.
+
 **Turning dials** — the test dial of a gas meter ("½ FOOT", "2 FEET"), the sweep hand of a water
 meter, a dial of an electricity meter (not its spinning disc): a needle whose position says nothing
 by itself, but how fast it goes round does. Choose **Turning dial** and draw the region round the
@@ -637,7 +651,8 @@ objects the region stays a border.
   checked and the ones nobody checked, accepted or rejected (marked as unchecked) — only the region of each,
   not the whole picture — with what was read and what was right, which reader read it and (for
   the wheel reader) where it saw each wheel — and, for a meter with pointer dials, a picture of
-  each dial as it was read and where its needle was found. Each image is cut with the region the reading was
+  each dial as it was read and where its needle was found (with a box of smaller digits: its picture
+  and what it read). Each image is cut with the region the reading was
   made in, so moving the region later does not spoil the readings from before. Write what the
   meter is in *What meter is this?* (make, type, camera, light) first. The ZIP stays under 24 MB
   so GitHub takes it (about 1,000 readings): the checked ones first, then the rejected ones, then

@@ -14,6 +14,8 @@ import {
   PLAY_URL,
   READING_SENSOR_NAME,
   SOUND_WAV_URL,
+  SPLIT_REGION,
+  SPLIT_URL,
   TURNED_COUNTER_REGION,
   TURNED_COUNTER_URL,
 } from './env';
@@ -816,6 +818,81 @@ test('a water meter with pointer dials: placed on its face in Settings, read as 
     await expect.poll(() => seen.evaluate((img: HTMLImageElement) => img.naturalWidth), { timeout: 30_000 }).toBeGreaterThan(0);
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: path.join('test-results', 'pages', info.project.name, 'review-dials.png'), fullPage: true });
+    errors.expectNone();
+  } finally {
+    await page.goto('about:blank');
+    await request.delete(`api/v1/sensors/${sensor.id}`);
+  }
+});
+
+test('a display with smaller last digits: a box placed on its face in Settings, read as more decimals', async ({ page, request }, info) => {
+  const errors = watchErrors(page);
+  // A water meter's LCD: whole m³ in big digits, the litres smaller beside them, the camera a little turned.
+  const { region, extra_region } = await (await request.get(SPLIT_REGION(12))).json();
+  const made = await request.post('api/v1/sensors', {
+    data: {
+      name: 'Litre meter',
+      kind: 'reading',
+      source_type: 'http',
+      source: SPLIT_URL('00957', '727', 12),
+      roi: region,
+      reading: { mode: 'counter', display: 'auto', decimals: 0, unit: 'm³', straighten: true },
+      interval_s: 3600,
+    },
+  });
+  expect(made.ok(), await made.text()).toBeTruthy();
+  const sensor = await made.json();
+  try {
+    await page.goto(`#/sensors/${sensor.id}/settings/detect`);
+    // The switch dials use: the picture edits the region, or the box of small digits.
+    await expect(page.locator('.frame .roi')).toBeVisible();
+    await press(page.getByTestId('edit-extra-region'), info);
+    await expect(page.locator('.frame .roi')).toHaveCount(0);
+    const card = page.getByTestId('extra-region-card');
+    const editor = card.getByTestId('extra-region-editor');
+    await expect(editor.locator('img')).toBeVisible({ timeout: 60_000 });
+    // Add the box: beside the region; dragged it moves, its handle sizes it.
+    await card.scrollIntoViewIfNeeded();
+    await press(card.getByTestId('extra-region-add'), info);
+    const box = card.getByTestId('extra-region');
+    await box.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const before = (await box.boundingBox())!;
+    const centre = { x: before.x + before.width / 2, y: before.y + before.height / 2 };
+    await drag(page, info, centre, { x: centre.x - before.width * 0.3, y: centre.y + before.height * 0.2 });
+    await expect.poll(async () => Math.round((await box.boundingBox())!.x)).toBeLessThan(Math.round(before.x));
+    const handle = card.getByTestId('extra-region-size');
+    await handle.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const h = (await handle.boundingBox())!;
+    const width = (await box.boundingBox())!.width;
+    await drag(page, info, { x: h.x + h.width / 2, y: h.y + h.height / 2 }, { x: h.x + h.width / 2 + width * 0.3, y: h.y + h.height / 2 });
+    await expect.poll(async () => (await box.boundingBox())!.width).toBeGreaterThan(width * 1.1);
+    await card.getByTestId('extra-region-digits').fill('3');
+    await card.getByTestId('extra-region-digits').blur();
+    await press(page.getByRole('button', { name: 'Read now' }), info);
+    await expect(card.getByTestId('extra-region-row')).toContainText(/Read/, { timeout: 30_000 });
+    await expectNoHorizontalOverflow(page);
+    await expectNoClipping(page, '.btn, .card');
+    await page.screenshot({ path: path.join('test-results', 'pages', info.project.name, 'settings-extra-region.png'), fullPage: true });
+
+    // The box where the small digits are: three more decimals.
+    const saved = await request.patch(`api/v1/sensors/${sensor.id}`, { data: { reading: { ...sensor.reading, extra_region } } });
+    expect(saved.ok(), await saved.text()).toBeTruthy();
+    await request.post(`api/v1/sensors/${sensor.id}/classify`);
+    await page.goto(`#/sensors/${sensor.id}/live`);
+    await expect(page.locator('.value-card .value')).toHaveText('957.727 m³', { timeout: 60_000 });
+    await page.goto(`#/sensors/${sensor.id}/settings/detect`);
+    await press(page.getByTestId('edit-extra-region'), info);
+    await expect(card.getByTestId('extra-region-row')).toContainText('Read 727', { timeout: 60_000 });
+
+    // A reading rejected as too low waits in Review, with the small digits to check it against.
+    await request.patch(`api/v1/sensors/${sensor.id}`, { data: { source: SPLIT_URL('00950', '123', 12) } });
+    await request.post(`api/v1/sensors/${sensor.id}/classify`);
+    await expect.poll(async () => (await (await request.get(`api/v1/review?sensor=${sensor.id}`)).json()).items.length, { timeout: 60_000 }).toBeGreaterThan(0);
+    await page.goto(`#/review?sensor=${sensor.id}`);
+    const seen = page.getByTestId('reading-seen').locator('img');
+    await expect(seen).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => seen.evaluate((img: HTMLImageElement) => img.naturalWidth), { timeout: 30_000 }).toBeGreaterThan(0);
+    await expectNoHorizontalOverflow(page);
     errors.expectNone();
   } finally {
     await page.goto('about:blank');

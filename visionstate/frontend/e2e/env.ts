@@ -37,6 +37,10 @@ export const PLAY_URL = (sound: 'siren' | 'dog_bark' | 'smoke_alarm' | 'speech' 
 export const METER_URL = (value: number, turn = 0, tilt = 0) =>
   `${CAMERA_URL}/meter.jpg?value=${value}&digits=5&dials=4&turn=${turn}&tilt=${tilt}`;
 export const METER_REGION = (turn = 0, tilt = 0) => `${CAMERA_URL}/meter-region.json?digits=5&dials=4&turn=${turn}&tilt=${tilt}`;
+/** A drawn display whose last digits are smaller and beside the others (a water meter's litres), the camera turned
+ * by `turn` degrees; its region and its extra region as a sensor stores them (scripts/fake_camera.py). */
+export const SPLIT_URL = (big: string, small: string, turn = 0) => `${CAMERA_URL}/split.jpg?big=${big}&small=${small}&turn=${turn}`;
+export const SPLIT_REGION = (turn = 0) => `${CAMERA_URL}/split-region.json?turn=${turn}`;
 /** A turning dial: a drawn gas meter test dial whose needle goes round `rpm` times a minute (scripts/fake_camera.py). */
 export const DIAL_SENSOR_NAME = 'Gas dial';
 export const DIAL_URL = (rpm = 3) => `${CAMERA_URL}/dial.jpg?rpm=${rpm}`;

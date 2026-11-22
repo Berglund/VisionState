@@ -6,8 +6,8 @@
   // that will be saved is shown before it is.
   import { api } from '../api';
   import { toastError } from '../app.svelte';
-  import { readingDetail, rightValue } from '../reading';
-  import type { Prediction, ReadingSettings } from '../types';
+  import { readingDetail, rightValue, type DecimalSettings } from '../reading';
+  import type { Prediction } from '../types';
   import Icon from './Icon.svelte';
 
   let {
@@ -19,7 +19,7 @@
   }: {
     item: Prediction;
     /** The sensor's reading settings (where the decimal point goes). */
-    reading: Pick<ReadingSettings, 'mode' | 'decimals' | 'display' | 'counter_reader' | 'dials'> | null;
+    reading: DecimalSettings | null;
     unit?: string;
     large?: boolean;
     /** Called after an answer was saved, with the new verdict. */

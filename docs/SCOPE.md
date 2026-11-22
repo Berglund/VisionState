@@ -366,6 +366,26 @@ on the camera picture, so circles stay round. A counter has dials when the user 
 change limit stays in the counter's own decimals; the settling tolerance and Home Assistant's display precision follow the
 value's.
 
+**A display's smaller last digits are read from a box of their own** (decided 2026-11-22): a water
+meter's LCD shows whole m³ in big digits and the litres in smaller ones at their top right; one
+region over both misread a real one (Kamstrup Multical 21: "00957.37", then "00957134", for
+957.734), while each part alone read at 100 %. `reading["extra_region"]` is a box with its number of
+digits, placed like pointer dials (in the plane the region is read in, in units of its height, on
+the straightened meter face) so it moves and straightens with the region; it is read with the same
+reader and display (`read_display`), its text appended to the region's and the confidence the lower
+of the two (`models.read_number`; `details["extra"]` keeps what it read alone). Its digits are more
+decimals (`settings.extra_digits`), so parsing, formatting, the change limit and Home Assistant's
+display precision follow as they do for dials. It goes with the displays read as text and with
+counters and values (`settings.EXTRA_REGION_DISPLAYS`, `EXTRA_REGION_MODES`): a mechanical counter
+has its dials, and a time left or a flow has no decimals. A box read with another number of digits
+than set is a *wrong digit count* (`readers.wrong_digit_count`): one small digit missed would shift
+every digit before it. The value is the same however its decimals are read, so the dials' own rules
+— a jittering last digit (`settle_steps_fine`) and their standard rate — stay theirs
+(`settings.dial_count`). One extra box, not a list: a display with three sizes of digits has not
+been seen. Rejected: a decimal point placed from what the reader sees (`readers.parse` ignores it on
+purpose: a stray dot is a common misread), and one region read as two at a size jump found by
+itself (no reliable signal on a display with its unit and icons beside the digits).
+
 **A turning dial gives a flow, not a value** ([`TURNING_DIAL_PLAN.md`](TURNING_DIAL_PLAN.md) §3,
 decided 2026-11-17): the test dial of a gas meter, a water meter's sweep hand. In the UI it is a
 third *What does it look like?*, in the code the reading mode `flow` (`settings.READING_DISPLAYS`
@@ -447,7 +467,8 @@ times its busiest shower) rejected right readings after a 35-minute update.
   nothing tells it from water used meanwhile — and then the "went down" lock below applies.
   Until it learned, a rate applies: `max_rate`, or when that is 0 `standard_steps_per_min` steps
   of the last digit a minute (issue #40's 0.04 m³ a minute, three decimals). The last digit is the
-  whole value's: with pointer dials the last dial's, in `standard_steps_per_min_dials` steps (one
+  whole value's: with pointer dials the last dial's, in `standard_steps_per_min_dials` steps (an extra region's
+  digits are plain decimals: `standard_steps_per_min`) (one
   of them is tiny, and 40 stopped ordinary water use on both four-dial meters of issue #59); the
   always-allowed margin follows it too. Counted from the wheels alone, a counter of whole m³ with
   four dials could rise 2 m³ at any reading, and a misread 188.99 for 187.99 went through. A
@@ -1063,13 +1084,14 @@ as a busy database would otherwise stop every sensor, MQTT and the API with it.
   memory for 20,000 readings, too much beside Home Assistant on a Raspberry Pi
   (`tests/test_reading_export.py` checks it). The images are the time it takes (about 5 ms each on a
   PC, several times that on a Pi), so an export of the new ones is also the quick one.
-  `readings.json` (`"format": 8`; 7 had `"seconds"` from the export's oldest reading, so two exports could not be put together, and no `"only_new"`; 6 had no pointer dials, 5 no `"straightened"`, 4 no `"confidence_rule"`, 3 no `"box"`, 2 left out
+  `readings.json` (`"format": 9`; 8 had no extra regions, 7 had `"seconds"` from the export's oldest reading, so two exports could not be put together, and no `"only_new"`; 6 had no pointer dials, 5 no `"straightened"`, 4 no `"confidence_rule"`, 3 no `"box"`, 2 left out
   the rejected readings nobody answered, so a sensor's checks could not be replayed: read text, value, rejection reason, confidence, answer, right value, day only and
   seconds since the sensor was made (the same in every export); per reading the reader id and app version (kept with every
   stored reading since 0.7.1b5, null before), whether the picture was greyscale (IR), whether
   the sensor's light was on and the camera picture's size; for the wheel reader each wheel's position, probability (the one the confidence is made
   of, `"confidence_rule"`) and most likely positions, the common shift and the value with the last wheel's fraction; a meter's
-  pointer dials as more rows with where the needle was found, and each dial's picture as read), the reading
+  pointer dials as more rows with where the needle was found, and each dial's picture as read; a display's
+  extra region as its picture, its digits and what it read alone), the reading
   settings without anything that tells where the sensor is (no source, name or region), the
   user's optional "What meter is this?" text, a README and a CC0 LICENSE — shared images may then
   be used in tests and evaluations. Images are crops of the stored frames at their resolution.
@@ -1190,6 +1212,7 @@ is part of backups and needs no restart.
 | **Licence plates** ✅ | Own cars known by their plate, by their look or both, one list of cars shared by every camera (cars that look the same told apart by their plates), unknown plates read into Home Assistant as one event per visit, a car's look learned from its plate, as many countries as possible — an open plate model and two made for plates (accepted first), a benchmark of 53 plates — [`PLATE_RECOGNITION_PLAN.md`](PLATE_RECOGNITION_PLAN.md) | 0.15.0 (betas 0.15.0b5–b17) |
 | **ESP32 microphones and cameras of our own** ✅ | ESPHome firmware and a guide in the app (boards, wiring, install), a camera set up for what each sensor looks at, its own flash and a light only when it is dark, a microphone that can be a voice assistant too — [`ESP32_PLAN.md`](ESP32_PLAN.md), [`esphome/README.md`](../esphome/README.md) | 0.15.0 (betas 0.15.0b7–b23) |
 | **Turning dials** | A reading sensor for one dial going round: the flow (ft³/min, L/min, kW …) and *running*, a black needle with print and a counterweight read (a public-domain US gas meter in the tests), checks every few seconds while it turns. Left: tried on real meters — [`TURNING_DIAL_PLAN.md`](TURNING_DIAL_PLAN.md) §6 | in beta, not released |
+| **Smaller digits beside the others** | A display's smaller last digits (a water meter's litres after its m³) read from a box of their own, placed on the straightened face and added as more decimals (§5; tests read a drawn display turned, and it was tried on a real Kamstrup Multical 21). Left: tried on more meters | not released |
 | **Better counter readings** | More shared meters, labels, loss and calibration for the next model, later the last value as an expectation — status per step in [`WHEEL_READER_PLAN.md`](WHEEL_READER_PLAN.md) | planned |
 | **Sound sensors** ✅ | A fourth sensor kind: sounds in a camera's or a microphone's stream, own sounds taught from clips, clips with the camera's video, review questions — status and what is left in [`SOUND_PLAN.md`](SOUND_PLAN.md) §13 | 0.13.0 (betas 0.13.0b1–b10) |
 

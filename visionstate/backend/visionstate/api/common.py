@@ -386,6 +386,17 @@ class DialIn(BaseModel):
     ccw: bool = False
 
 
+class ExtraRegionIn(BaseModel):
+    """A display's extra region (settings.READING_DEFAULTS["extra_region"]): its box in units of the
+    region's height from its top-left corner, and how many digits it shows."""
+
+    x: float = Field(ge=-READING["dial_reach"], le=READING_LIMITS["digits"][1] * 2 + READING["dial_reach"])
+    y: float = Field(ge=-READING["dial_reach"], le=1 + READING["dial_reach"])
+    w: float = Field(ge=READING["extra_region_min"], le=READING_LIMITS["digits"][1] * 2)
+    h: float = Field(ge=READING["extra_region_min"], le=1 + 2 * READING["dial_reach"])
+    digits: int = Field(ge=1, le=READING["max_extra_digits"])
+
+
 class ReadingIn(BaseModel):
     """How a reading sensor turns what it reads into a value. Defaults and limits: settings.READING_*."""
 
@@ -399,6 +410,7 @@ class ReadingIn(BaseModel):
     wheel_reader: str = Field(default=READING_DEFAULTS["wheel_reader"], validate_default=True)
     straighten: bool = READING_NEW_SENSOR["straighten"]
     dials: list[DialIn] = Field(default=[], max_length=READING["max_dials"])
+    extra_region: ExtraRegionIn | None = READING_DEFAULTS["extra_region"]
     max_step: float = Field(default=READING_DEFAULTS["max_step"], ge=_dlo["max_step"], le=_dhi["max_step"])
     change_limit: str = READING_DEFAULTS["change_limit"]
     max_rate: float = Field(default=READING_DEFAULTS["max_rate"], ge=_dlo["max_rate"], le=_dhi["max_rate"])

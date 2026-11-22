@@ -1163,7 +1163,7 @@ def test_wheel_counter_sensor_flow(settings):
                 return manifest
 
         manifest = export()
-        assert manifest["format"] == 8 and manifest["meter"] is None and manifest["left_out"] == 0
+        assert manifest["format"] == 9 and manifest["meter"] is None and manifest["left_out"] == 0
         assert manifest["only_new"] is False
         assert manifest["reader"] == readers.DEFAULT_WHEEL_READER
         assert manifest["settings"]["counter_reader"] == "wheels"

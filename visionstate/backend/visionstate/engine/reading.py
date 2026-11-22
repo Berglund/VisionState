@@ -16,7 +16,7 @@ from .. import change_limit, imaging, readers, timing, turns
 from ..db import Prediction, ReadingStat, ReadingWatch, Sensor
 from ..mqtt import rate_unit, topics
 from ..redact import redact
-from ..settings import COUNTER_LIMIT, READING, REMINDER, TURNING, VERSION
+from ..settings import COUNTER_LIMIT, READING, REMINDER, TURNING, VERSION, extra_region
 from .base import RuntimeBase
 from .logic import percent, reading_verdict
 from .models import ModelsMixin
@@ -312,8 +312,8 @@ class ReadingChecksMixin(ModelsMixin, PublishingMixin, RuntimeBase):
         spot = reason is None and not changed and random.random() < float(cfg.reading["spot_rate"])
         if changed or reason is not None or spot:
             published = live.debouncer.published if reason is None else None
-            # The region it was read in (whether straightened, and its pointer dials): the frame is
-            # whole, and the region may be moved later.
+            # The region it was read in (whether straightened, its pointer dials or extra region):
+            # the frame is whole, and the region may be moved later.
             details = {
                 "text": text.text,
                 "value": shown,
@@ -321,6 +321,7 @@ class ReadingChecksMixin(ModelsMixin, PublishingMixin, RuntimeBase):
                 "roi": cfg.roi,
                 "straighten": cfg.reading["straighten"],
                 **({"dials": cfg.reading["dials"]} if cfg.reading.get("dials") else {}),
+                **({"extra_region": region} if (region := extra_region(cfg.reading)) else {}),
                 **(text.details or {}),
                 "app": VERSION,
                 "lamp": lit,

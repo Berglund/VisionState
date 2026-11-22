@@ -239,7 +239,8 @@ def reading_verdict(
 ) -> tuple[str | None, bool]:
     """Whether a reading is rejected, and why (None: accepted), and whether it is "settling".
 
-    Rejected: nothing read, another number of digits than the counter has wheels, too unsure,
+    Rejected: nothing read, another number of digits than the counter has wheels (or the extra
+    region has digits), too unsure,
     or implausible next to the ``last`` published value (see readers.implausible; ``limit``: how
     much a counter may go up, change_limit.limit). Settling: one
     step below the last value, the last wheel of a counter turning; the value stays, but that is
@@ -247,7 +248,7 @@ def reading_verdict(
     """
     if value is None:
         return "nothing read", False
-    if readers.wrong_digit_count(text.text, settings):
+    if readers.wrong_digit_count(text.text, settings, text.details):
         return "wrong digit count", False
     if text.score < threshold:
         return "unsure", False

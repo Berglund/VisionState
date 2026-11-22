@@ -15,7 +15,7 @@ from ..db import Sensor
 from ..dials import read_needles, read_turning
 from ..readers import uses_wheels, wheel_reader_of
 from ..redact import redact
-from ..settings import DETECTION, KIND_OBJECTS, KIND_READING, KIND_STATES, READING, merge_reading
+from ..settings import DETECTION, KIND_OBJECTS, KIND_READING, KIND_STATES, READING, extra_region, merge_reading
 from .base import RuntimeBase
 from .logic import filter_detections
 from .training import TrainingMixin
@@ -181,7 +181,9 @@ class ModelsMixin(TrainingMixin, RuntimeBase):
         The text's ``details`` name the reader that read it (``reader``). A straightened region
         (``reading["straighten"]``) is read upright: the readers get it already straightened. A
         counter's pointer dials (``reading["dials"]``) are read from the whole frame first: they lie
-        around the region, in the plane it is read in. A turning dial (``"dial"`` display) is its
+        around the region, in the plane it is read in. So does a display's extra region
+        (settings.extra_region): its text is added to the region's (``details["extra"]``: what it
+        read on its own). A turning dial (``"dial"`` display) is its
         needle: the position as the text, the needle as found drawn on the dial as the image."""
         straightened = bool(reading.get("straighten")) and imaging.region_corners(roi) is not None
         if reading.get("display") == "dial":
@@ -212,7 +214,22 @@ class ModelsMixin(TrainingMixin, RuntimeBase):
             text, used = await asyncio.to_thread(
                 reader.read_display, region, reading["display"], int(reading["digits"])
             )
-        return replace(text, details={"reader": reader.spec.id, **(text.details or {})}), used
+        text = replace(text, details={"reader": reader.spec.id, **(text.details or {})})
+        if (box := extra_region(reading)) is None:
+            return text, used
+        # An extra region (smaller last digits beside the others): read on its own, its digits after
+        # the region's, as sure as the less sure of the two; the reader saw both, side by side.
+        cut = await asyncio.to_thread(imaging.extra_region_image, image, roi, box, straightened)
+        if cut is None:
+            extra, extra_used = readers.Text("", 0.0), None
+        else:
+            async with timing.slot(self._sem):
+                extra, extra_used = await asyncio.to_thread(reader.read_display, cut, reading["display"])
+        details = {**(text.details or {}), "extra": {"text": extra.text, "score": round(extra.score, 4)}}
+        joined = readers.Text(text.text + extra.text, min(text.score, extra.score), details)
+        if extra_used is not None:
+            used = await asyncio.to_thread(imaging.side_by_side, [used, extra_used])
+        return joined, used
 
     async def detect_objects(
         self, image: Image.Image, roi: dict | None, objects: dict, threshold: float, all_classes: bool = False

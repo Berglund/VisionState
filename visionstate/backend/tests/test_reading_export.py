@@ -119,7 +119,7 @@ def test_a_full_export_keeps_the_checked_and_rejected_ones_and_a_spread_of_the_a
     rejected = {20, 40, 60, 80}
     add(db, sid, made, [{"hour": h, "ok": checked.get(h), "rejected": h in rejected} for h in range(100)])
     everything, _ = export(db, storage, sid, tmp_path)
-    assert everything["format"] == 8 and everything["left_out"] == 0 and len(everything["readings"]) == 100
+    assert everything["format"] == 9 and everything["left_out"] == 0 and len(everything["readings"]) == 100
     weight = (tmp_path / "readings.zip").stat().st_size / 100
     # Room for about 25 readings: the 7 that matter most, then accepted ones from all through the time.
     with patch.dict(READING, {"export_max_mb": (100_000 + 25 * weight) / 1e6}):

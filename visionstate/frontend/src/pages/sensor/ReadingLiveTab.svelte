@@ -97,8 +97,9 @@
               : ''}. If a
             digit is cut off or sits in two fields, adjust the region or the number of digits under Settings → Region and reading.
           {:else}
-            If digits are cut off or faint segments show up here, draw the region tighter around the number or pick the
-            display type under Settings → Region and reading.
+            {reading.extra_region ? 'The digits, then the small digits beside them. ' : ''}If digits are cut off or faint
+            segments show up here, draw the region tighter around the number or pick the display type under Settings →
+            Region and reading.
           {/if}
         </p>
       </section>

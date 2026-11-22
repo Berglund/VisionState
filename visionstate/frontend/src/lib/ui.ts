@@ -327,6 +327,9 @@ export const READING_TYPE_MODES: Record<ReadingType, ReadingMode[]> = {
 /** A new pointer dial (DialsEditor): its radius in units of the counter region's height, and how far
  * beside the last dial it is put (in its radii). */
 export const DIAL_NEW = { radius: 0.6, gap: 2.4 };
+/** A new extra region (ExtraRegionEditor), in units of the region's height: this far right of the region, at
+ * its top, this wide and high, and the digits it starts with (a water meter's litres). */
+export const EXTRA_REGION_NEW = { gap: 0.05, w: 1, h: 0.6, digits: 3 };
 
 /** Default Home Assistant device class for a unit (the user can change it). */
 export const UNIT_DEVICE_CLASS: Record<string, string> = {

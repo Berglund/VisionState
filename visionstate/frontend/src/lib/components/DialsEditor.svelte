@@ -1,13 +1,12 @@
 <script lang="ts">
-  // A mechanical counter's pointer dials, placed on its meter face (docs/POINTER_DIAL_PLAN.md). The
-  // face is shown straightened the way the counter is read (the backend's imaging.meter_face), with
-  // the counter's region outlined; each dial is a circle on it: drag it to move it, drag its handle to
-  // size it. The first dial is ×0.1 of the last wheel, the next ×0.01 and so on. Mouse and touch
-  // (pointer events), like the region editor.
+  // A mechanical counter's pointer dials, placed on its meter face (docs/POINTER_DIAL_PLAN.md,
+  // MeterFace): each dial is a circle on it: drag it to move it, drag its handle to size it. The first
+  // dial is ×0.1 of the last wheel, the next ×0.01 and so on.
   import { app } from '../app.svelte';
   import type { Dial, DialRead, ReadPreview } from '../types';
   import { DIAL_NEW } from '../ui';
   import Icon from './Icon.svelte';
+  import MeterFace from './MeterFace.svelte';
 
   type Drag = { mode: 'move' | 'size'; index: number; start: [number, number]; orig: Dial };
 
@@ -24,18 +23,12 @@
   // Read positions belong to the dials they were read with: only shown while the count matches.
   const readsMatch = $derived(reads.length === dials.length);
 
-  let surface = $state<HTMLDivElement>();
+  let face = $state<MeterFace>();
   let drag: Drag | null = null;
   let selected = $state(-1);
 
   /** ×0.1, ×0.01 …: what one turn of the dial is worth, in the counter's unit. */
   const factor = (k: number) => `×${(10 ** -(decimals + k + 1)).toFixed(decimals + k + 1)}`;
-
-  function planePoint(e: PointerEvent): [number, number] {
-    const r = surface!.getBoundingClientRect();
-    const [x0, y0, x1, y1] = box!;
-    return [x0 + ((e.clientX - r.left) / r.width) * (x1 - x0), y0 + ((e.clientY - r.top) / r.height) * (y1 - y0)];
-  }
 
   const round = (n: number) => Math.round(n * 1e4) / 1e4;
   const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -54,21 +47,14 @@
   }
 
   function start(e: PointerEvent, index: number, mode: Drag['mode']) {
-    if (!box) return;
-    e.stopPropagation();
-    e.preventDefault();
-    try {
-      surface!.setPointerCapture(e.pointerId);
-    } catch {
-      /* pointer no longer active: moves still bubble to the surface */
-    }
+    if (!box || !face) return;
+    face.capture(e);
     selected = index;
-    drag = { mode, index, start: planePoint(e), orig: { ...dials[index] } };
+    drag = { mode, index, start: face.planePoint(e), orig: { ...dials[index] } };
   }
 
-  function move(e: PointerEvent) {
+  function move(p: [number, number]) {
     if (!drag) return;
-    const p = planePoint(e);
     const { orig, index } = drag;
     const next =
       drag.mode === 'move'
@@ -106,42 +92,31 @@
 
 {#if preview?.face && box}
   <div class="col" style="gap:var(--space-2)">
-    <div
-      class="surface"
-      bind:this={surface}
-      onpointermove={move}
-      onpointerup={end}
-      onpointercancel={end}
-      role="presentation"
-      data-testid="dials-editor"
-    >
-      <img src={preview.face} alt="The meter face, straightened" draggable="false" />
-      <svg viewBox="{box[0]} {box[1]} {box[2] - box[0]} {box[3] - box[1]}" preserveAspectRatio="none" aria-hidden="true">
-        <rect x="0" y="0" width={regionWidth} height="1" class="region" />
+    <MeterFace bind:this={face} preview={{ ...preview, face: preview.face, face_box: box }} testid="dials-editor" onmove={move} onend={end}>
+      {#snippet shapes()}
         {#each dials as d, i (i)}
           {@const n = readsMatch ? needle(d, reads[i]) : null}
           <circle cx={d.x} cy={d.y} r={d.r} class="dial" class:selected={selected === i} onpointerdown={(e) => start(e, i, 'move')} role="presentation" />
           {#if n}<line x1={d.x} y1={d.y} x2={n.x} y2={n.y} class="needle" />{/if}
         {/each}
-      </svg>
-      {#each dials as d, i (i)}
-        <span
-          class="label"
-          style:left="{((d.x - box[0]) / (box[2] - box[0])) * 100}%"
-          style:top="{((d.y - d.r - box[1]) / (box[3] - box[1])) * 100}%"
-          data-testid="dial-label">{factor(i)}</span
-        >
-        <span
-          class="handle"
-          style:left="{((d.x + d.r - box[0]) / (box[2] - box[0])) * 100}%"
-          style:top="{((d.y - box[1]) / (box[3] - box[1])) * 100}%"
-          onpointerdown={(e) => start(e, i, 'size')}
-          title="Drag to size the dial"
-          role="presentation"
-          data-testid="dial-size"
-        ></span>
-      {/each}
-    </div>
+      {/snippet}
+      {#snippet overlay()}
+        {#each dials as d, i (i)}
+          {@const top = face?.at(d.x, d.y - d.r)}
+          {@const side = face?.at(d.x + d.r, d.y)}
+          <span class="label" style:left={top?.left} style:top={top?.top} data-testid="dial-label">{factor(i)}</span>
+          <span
+            class="handle"
+            style:left={side?.left}
+            style:top={side?.top}
+            onpointerdown={(e) => start(e, i, 'size')}
+            title="Drag to size the dial"
+            role="presentation"
+            data-testid="dial-size"
+          ></span>
+        {/each}
+      {/snippet}
+    </MeterFace>
     <p class="help">
       Put a circle on each pointer dial, the first on the ×0.1 dial: drag a circle to move it, its handle to size it.
       The dashed box is the counter.
@@ -179,42 +154,6 @@
 {/if}
 
 <style>
-  .surface {
-    --handle: 16px;
-    position: relative;
-    overflow: hidden;
-    background: var(--c-sunken);
-    border-radius: var(--radius-sm);
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    touch-action: none;
-  }
-  @media (pointer: coarse) {
-    .surface {
-      --handle: 26px;
-    }
-  }
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
-    pointer-events: none;
-  }
-  svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-  .region {
-    fill: none;
-    stroke: var(--c-accent);
-    stroke-width: 2px;
-    stroke-dasharray: 6 5;
-    vector-effect: non-scaling-stroke;
-  }
   .dial {
     fill: var(--c-accent);
     fill-opacity: 0.12;

@@ -18,7 +18,7 @@ import math
 from collections import deque
 from dataclasses import dataclass, field
 
-from .settings import COUNTER_LIMIT, extra_digits, value_decimals
+from .settings import COUNTER_LIMIT, dial_count, value_decimals
 
 # Readings that were read with confidence but do not fit the last value.
 IMPLAUSIBLE = ("went down", "changed too much")
@@ -63,7 +63,7 @@ def margin(settings: dict) -> float:
 def standard_rate(settings: dict) -> float:
     """The standard limit per hour: steps of the whole value's last digit a minute (with pointer
     dials the last dial's, which turns far faster than a wheel: its own number of steps)."""
-    steps = COUNTER_LIMIT["standard_steps_per_min_dials" if extra_digits(settings) else "standard_steps_per_min"]
+    steps = COUNTER_LIMIT["standard_steps_per_min_dials" if dial_count(settings) else "standard_steps_per_min"]
     return steps * 10 ** -value_decimals(settings) * 60
 
 

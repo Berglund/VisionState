@@ -15,6 +15,7 @@ from .. import imaging, readers
 from ..redact import redact
 from ..settings import (
     DETECTION,
+    EXTRA_REGION_DISPLAYS,
     READING,
     RUNTIME,
     TRIGGER_DEFAULTS,
@@ -168,7 +169,9 @@ async def preview_read(body: ReadPreviewIn, request: Request) -> dict:
         "value": None if dial else readers.format_value(readers.parse(text.text, settings), settings),
         **({"needle": (text.details or {}).get("needle")} if dial else {}),
         # A mechanical counter read with another number of digits than it has wheels.
-        "wrong_digit_count": readers.wrong_digit_count(text.text, settings),
+        "wrong_digit_count": readers.wrong_digit_count(text.text, settings, text.details),
+        # Its extra region as read on its own (settings.extra_region), None without one.
+        "extra": (text.details or {}).get("extra"),
         # Its pointer dials as read: where each needle was found (None: none seen) and how sure.
         "dials": [
             {"needle": row.get("needle"), "certainty": row.get("certainty", 0.0)}
@@ -178,10 +181,11 @@ async def preview_read(body: ReadPreviewIn, request: Request) -> dict:
 
 
 def meter_face(image: Image.Image, roi: dict | None, settings: dict) -> dict:
-    """For a counter read by a wheel reader: the meter face around its region, straightened as the
-    counter is read (imaging.meter_face), where pointer dials are placed — the picture and the part
+    """For a counter read by a wheel reader, or a display that can have an extra region
+    (settings.EXTRA_REGION_DISPLAYS): the meter face around its region, straightened as it is read
+    (imaging.meter_face), where pointer dials and extra regions are placed — the picture and the part
     of the plane it shows (``face_box``, in units of the region's height). Nothing for others."""
-    if not readers.uses_wheels(settings):
+    if not readers.uses_wheels(settings) and settings["display"] not in EXTRA_REGION_DISPLAYS:
         return {}
     straightened = bool(settings.get("straighten")) and imaging.region_corners(roi) is not None
     flat = imaging.reading_plane(image, roi, straightened)

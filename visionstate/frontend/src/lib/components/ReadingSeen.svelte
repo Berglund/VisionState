@@ -1,6 +1,6 @@
 <script lang="ts">
-  // What the reader saw in a stored reading of a meter with pointer dials, so the digits the region
-  // does not show can be checked. Shows nothing for a reading without dials.
+  // What the reader saw in a stored reading of a meter with pointer dials or a display with a box of
+  // smaller digits, so the digits the region does not show can be checked. Shows nothing for others.
   import { api } from '../api';
   import { readingDetail } from '../reading';
   import type { Prediction } from '../types';
@@ -12,6 +12,13 @@
   <figure data-testid="reading-seen">
     <img src={api.historySeenUrl(item.id)} alt="The wheels and pointer dials as the reader saw them" />
     <figcaption class="xsmall faint">The wheels, then each pointer dial with the needle that was found drawn on it.</figcaption>
+  </figure>
+{:else if readingDetail(item).extra_region}
+  <figure data-testid="reading-seen">
+    <img src={api.historySeenUrl(item.id)} alt="The digits and the small digits as the reader saw them" />
+    <figcaption class="xsmall faint">
+      The digits, then the small digits{readingDetail(item).extra ? ` (read “${readingDetail(item).extra?.text}”)` : ''}.
+    </figcaption>
   </figure>
 {/if}
 

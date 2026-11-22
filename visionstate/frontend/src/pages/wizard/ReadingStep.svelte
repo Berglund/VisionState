@@ -3,15 +3,16 @@
   // fresh frame whose region can be fine-tuned right there, and its entity in Home Assistant.
   import { onMount, untrack } from 'svelte';
   import { api } from '../../lib/api';
-  import CounterDialsSwitch from '../../lib/components/CounterDialsSwitch.svelte';
   import DialsEditor from '../../lib/components/DialsEditor.svelte';
   import DigitCells from '../../lib/components/DigitCells.svelte';
+  import ExtraRegionEditor from '../../lib/components/ExtraRegionEditor.svelte';
   import ReadingEditor from '../../lib/components/ReadingEditor.svelte';
+  import ReadingPartSwitch from '../../lib/components/ReadingPartSwitch.svelte';
   import RegionButtons from '../../lib/components/RegionButtons.svelte';
   import RoiEditor from '../../lib/components/RoiEditor.svelte';
   import StraightenSwitch from '../../lib/components/StraightenSwitch.svelte';
   import { pct } from '../../lib/format';
-  import { digitsSeen, extraDigits, readingUnit } from '../../lib/reading';
+  import { canExtraRegion, digitsSeen, extraDigits, extraRegionOf, readingUnit } from '../../lib/reading';
   import { toPoints, toRectangle } from '../../lib/roi';
   import type { ReadPreview, ReadingSettings, Roi } from '../../lib/types';
   import HaPreview from './HaPreview.svelte';
@@ -30,10 +31,16 @@
   let result = $state<ReadPreview | null>(null);
   let error = $state('');
   let busy = $state(false);
-  // A counter read by a wheel reader can also have pointer dials: the picture edits one or the other.
-  let editing = $state<'counter' | 'dials'>('counter');
+  // A counter read by a wheel reader can also have pointer dials, a display a box of smaller digits: the
+  // picture edits the region or those.
+  let editing = $state<'region' | 'extra'>('region');
   const canDial = $derived(reading.display === 'counter' && reading.counter_reader === 'wheels');
+  const canExtra = $derived(canExtraRegion(reading));
   const digitsRead = $derived(reading.digits + extraDigits(reading));
+  // The box of smaller digits read with another number of digits than it has.
+  const extraWrong = $derived(
+    !!result?.extra && !!extraRegionOf(reading) && digitsSeen(result.extra.text) !== reading.extra_region?.digits,
+  );
   const dial = $derived(reading.display === 'dial');
 
   /** Read a fresh frame with the current region and settings (also called when the light is on). */
@@ -87,6 +94,12 @@
       <span class="muted">— the flow comes once it has turned for a while.</span>
     {:else if dial && result}
       <span class="muted">No needle found. Draw the region round the whole dial in the image below.</span>
+    {:else if result?.wrong_digit_count && extraWrong}
+      <span class="danger-text">
+        The small digits read <span class="mono">“{result.extra?.text || '—'}”</span> — {digitsSeen(result.extra?.text)}
+        digits, not {reading.extra_region?.digits}.
+      </span>
+      <span class="muted">Put the box round the small digits only, or change their number under <em>Small digits</em>.</span>
     {:else if result?.wrong_digit_count}
       <span class="danger-text">
         Read <span class="mono">“{result.text || '—'}”</span> — {digitsSeen(result.text)} digits, not {digitsRead}.
@@ -101,11 +114,17 @@
     {#if busy && result}<span class="faint"> (reading…)</span>{/if}
   {/snippet}
   {#if canDial && result}
-    <div class="edit-switch"><CounterDialsSwitch bind:editing dials={reading.dials.length} /></div>
+    <div class="edit-switch"><ReadingPartSwitch bind:editing kind="dials" count={reading.dials.length} /></div>
+  {:else if canExtra && result}
+    <div class="edit-switch">
+      <ReadingPartSwitch bind:editing kind="digits" count={reading.extra_region?.digits ?? 0} />
+    </div>
   {/if}
   <div class="read-images">
-      {#if canDial && editing === 'dials' && result}
+      {#if canDial && editing === 'extra' && result}
         <DialsEditor preview={result} bind:dials={reading.dials} decimals={reading.decimals} />
+      {:else if canExtra && editing === 'extra' && result}
+        <ExtraRegionEditor preview={result} bind:region={reading.extra_region} decimals={reading.decimals} />
       {:else}
       <div class="col" style="gap:6px">
         <!-- The first step's frame until the test has one: the first test loads the reader, and may fail. -->
@@ -143,7 +162,9 @@
               ? reading.counter_reader === 'wheels'
                 ? ` — one field per wheel${reading.dials.length ? ', then the dials' : ''}`
                 : ' — the wheels without their dividers'
-              : ''}</span>
+              : extraRegionOf(reading)
+                ? ' — the digits, then the small digits'
+                : ''}</span>
         <img class="seen" src={result.read_image} alt="The region as the number reader saw it" />
       </div>
       {/if}

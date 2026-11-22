@@ -256,6 +256,9 @@ export interface ReadingSettings {
   straighten: boolean;
   /** counter_reader "wheels": the meter's pointer dials, ×0.1 first (each one more decimal). */
   dials: Dial[];
+  /** Displays read as text: a box of smaller last digits beside the others, read on its own and added as
+   * more decimals (settings.extra_region); null = none. */
+  extra_region: ExtraRegion | null;
   /** Values and times left, and counters with change_limit "step": the largest change between two
    * readings (0 = no limit). */
   max_step: number;
@@ -313,6 +316,16 @@ export interface Dial {
   ccw: boolean;
 }
 
+/** An extra region: its box in units of the region's height from its top-left corner, in the plane the
+ * region is read in (straightened), and how many digits it shows. */
+export interface ExtraRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  digits: number;
+}
+
 /** A pointer dial as read: where its needle was found (0.0-9.9; null = none seen) and how sure (0-1). */
 export interface DialRead {
   needle: number | null;
@@ -327,13 +340,16 @@ export interface ReadPreview {
   value: string | null;
   /** A mechanical counter read with another number of digits than it has wheels. */
   wrong_digit_count: boolean;
-  /** Counters read by a wheel reader: the meter face around the region, straightened as it is read, and
-   * the part of the plane it shows ([x1, y1, x2, y2] in units of the region's height): where dials go. */
+  /** Counters read by a wheel reader and displays: the meter face around the region, straightened as it is
+   * read, and the part of the plane it shows ([x1, y1, x2, y2] in units of the region's height): where
+   * dials and extra regions go. */
   face?: string;
   face_box?: [number, number, number, number];
   /** The region in the same units: from 0, 0 to region_width, 1. */
   region_width?: number;
   dials: DialRead[];
+  /** What the extra region read on its own (null without one). */
+  extra?: { text: string; score: number } | null;
   /** A turning dial: where its needle points (0.0-9.9), null when none was found. */
   needle?: number | null;
 }
@@ -860,6 +876,11 @@ export interface AppConfig {
   /** Pointer dials: at most max_dials, radius within dial_radius, centre at most dial_reach outside the
    * region (both in units of the region's height). */
   reading_dials: { max_dials: number; dial_radius: [number, number]; dial_reach: number };
+  /** An extra region: at most max_extra_digits digits, its sides at least extra_region_min (in units of the
+   * region's height); read only with these displays and modes. */
+  reading_extra_region: { max_extra_digits: number; extra_region_min: number };
+  extra_region_displays: ReadingDisplay[];
+  extra_region_modes: ReadingMode[];
   /** Longest "What meter is this?" text of a readings export. */
   reading_export_meter_max_chars: number;
   storage_defaults: { history_max_gb: number };

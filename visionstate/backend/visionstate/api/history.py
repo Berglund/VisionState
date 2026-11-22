@@ -19,7 +19,15 @@ from sqlalchemy import ColumnElement, Select, and_, func, or_, select
 
 from .. import imaging
 from ..db import Prediction, Sensor
-from ..settings import HISTORY, HISTORY_EVENTS, KIND_READING, SENSOR_KINDS, merge_reading
+from ..settings import (
+    EXTRA_REGION_DISPLAYS,
+    EXTRA_REGION_MODES,
+    HISTORY,
+    HISTORY_EVENTS,
+    KIND_READING,
+    SENSOR_KINDS,
+    merge_reading,
+)
 from ..storage import VIDEO_CLIP_SUFFIX, is_clip
 from .common import API_PREFIX, iso, runtime
 
@@ -275,9 +283,10 @@ def history_clip(prediction_id: int, request: Request) -> Response:
 
 @router.get("/history/{prediction_id}/seen")
 async def history_seen(prediction_id: int, request: Request) -> Response:
-    """What the reader saw in a stored reading of a meter with pointer dials: its wheels and each
-    dial with its needle (*What the reader sees* on the Live tab), made again from the stored frame
-    with the region, dials and reader it was read with. The region alone does not show the dials."""
+    """What the reader saw in a stored reading of a meter with pointer dials (its wheels and each
+    dial with its needle) or of a display with an extra region (the region and the extra region side
+    by side): *What the reader sees* on the Live tab, made again from the stored frame with the
+    region, dials or extra region and reader it was read with. The region alone does not show them."""
     rt = runtime(request)
 
     def stored() -> tuple[Path, dict | None, dict]:
@@ -285,12 +294,23 @@ async def history_seen(prediction_id: int, request: Request) -> Response:
             row = s.get(Prediction, prediction_id)
             sensor = s.get(Sensor, row.sensor_id) if row else None
             details = (row.probs or {}) if row and sensor and sensor.kind == KIND_READING else {}
-            if not row or not sensor or not row.frame or not details.get("dials"):
-                raise HTTPException(404, "No pointer dials in this reading")
+            if not row or not sensor or not row.frame or not (details.get("dials") or details.get("extra_region")):
+                raise HTTPException(404, "No pointer dials or extra region in this reading")
+            settings = merge_reading(sensor.reading)
+            if details.get("extra_region"):
+                # Read as text again, with a display and mode that read an extra region.
+                reading = {
+                    **settings,
+                    "display": settings["display"] if settings["display"] in EXTRA_REGION_DISPLAYS else "auto",
+                    "mode": settings["mode"] if settings["mode"] in EXTRA_REGION_MODES else "counter",
+                    "straighten": bool(details.get("straighten")),
+                    "extra_region": details["extra_region"],
+                }
+                return rt.storage.history_path(row.sensor_id, row.frame), details.get("roi"), reading
             wheels = details.get("wheels") or {}
             digits = len(wheels.get("per_wheel") or []) - int(wheels.get("dials") or 0)
             reading = {
-                **merge_reading(sensor.reading),
+                **settings,
                 "display": "counter",
                 "counter_reader": "wheels",
                 "wheel_reader": details.get("reader"),

@@ -90,6 +90,10 @@ READING_MODES = ("counter", "value", "time_left", "flow")
 # "dial" is a turning dial: the region is the dial, its needle is read (dials.read_needle) and its
 # turns counted (turns.py); it goes with the "flow" mode.
 READING_DISPLAYS = ("auto", "led", "lcd", "counter", "dial")
+# The displays and modes an extra region (READING_DEFAULTS["extra_region"]) is read with: displays
+# read as text, values with decimals.
+EXTRA_REGION_DISPLAYS = ("auto", "led", "lcd")
+EXTRA_REGION_MODES = ("counter", "value")
 # What reads a "counter" display: "wheels" gives each wheel's position (readers.WheelReader, a wheel
 # half way between two digits is read as such); "ocr" reads the wheels as text with the number reader.
 COUNTER_READERS = ("wheels", "ocr")
@@ -119,6 +123,12 @@ READING_DEFAULTS = {
     # (imaging.reading_plane), in units of the region's height from its top-left corner — {"x", "y",
     # "r", "ccw"} (ccw: the dial turns anticlockwise).
     "dials": [],
+    # Displays read as text (EXTRA_REGION_DISPLAYS) whose last digits are smaller and beside the
+    # others (a water meter's litres next to its m³): a second box, read on its own and its digits
+    # added as more decimals (settings.extra_region, settings.extra_digits). {"x", "y", "w", "h",
+    # "digits"}: the box in the plane the region is read in (imaging.reading_plane), in units of the
+    # region's height from its top-left corner, as pointer dials are; None: no such box.
+    "extra_region": None,
     # A turning dial ("dial" display, "flow" mode): what one turn is in ``unit`` (2 for a gas meter's
     # 2 ft³ dial; 1/150 for an electricity meter's 150 turns a kWh), whether it turns anticlockwise,
     # and the flow is the turns over about this many seconds.
@@ -264,7 +274,7 @@ READING = {
     # registry): a wheel's share is the model's probability within this many bins of where the
     # value puts it.
     "wheel_weakest_bins": 4,
-    # A counter with extra digits (extra_digits: pointer dials): its last digit jitters by a step or
+    # A counter with pointer dials (dial_count): its last digit jitters by a step or
     # two between readings. A reading this many steps below the value keeps it ("settling"), as one
     # step does without them, instead of being rejected as going down.
     "settle_steps_fine": 2,
@@ -295,6 +305,10 @@ READING = {
     "dial_wheel_exact_from": 8,
     "dial_wheel_stand_weight": 0.3,
     "max_dials": 6,
+    # An extra region (READING_DEFAULTS["extra_region"]): at most this many digits, its sides at least
+    # extra_region_min of the region's height, inside dial_reach around the region like a dial.
+    "max_extra_digits": 6,
+    "extra_region_min": 0.1,
     "dial_radius": (0.1, 4.0),
     "dial_reach": 6.0,
     "face_size": 720,
@@ -1218,10 +1232,27 @@ def merge_sound(stored: dict | None) -> dict:
 READING_NEW_SENSOR = {"straighten": True}
 
 
+def extra_region(reading: dict) -> dict | None:
+    """A reading sensor's extra region (READING_DEFAULTS["extra_region"]) when it reads one: a
+    display read as text, a counter or a value. Kept but not read with any other display or mode."""
+    region = reading.get("extra_region")
+    if not region or reading.get("display") not in EXTRA_REGION_DISPLAYS:
+        return None
+    return region if reading.get("mode") in EXTRA_REGION_MODES else None
+
+
 def extra_digits(reading: dict) -> int:
-    """Digits a reading sensor reads beyond its wheels: one per pointer dial. Only a mechanical
-    counter read by a wheel reader has them. ("fraction", the last wheel's tenth as one more digit,
-    was offered in 0.12.0b1 only: a sensor that stored it reads as one without it.)"""
+    """Digits a reading sensor reads beyond its region: one per pointer dial of a mechanical counter
+    read by a wheel reader, or the digits of a display's extra region (``extra_region``). ("fraction",
+    the last wheel's tenth as one more digit, was offered in 0.12.0b1 only: a sensor that stored it
+    reads as one without it.)"""
+    if (region := extra_region(reading)) is not None:
+        return int(region["digits"])
+    return dial_count(reading)
+
+
+def dial_count(reading: dict) -> int:
+    """The pointer dials a reading sensor reads: only a mechanical counter read by a wheel reader has them."""
     if reading.get("display") != "counter" or reading.get("counter_reader") != "wheels":
         return 0
     return len(reading.get("dials") or [])

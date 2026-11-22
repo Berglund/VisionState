@@ -548,6 +548,40 @@ def meter_face(image: Image.Image, flat: Plane, reach: float, longest: int) -> t
     return picture, [round(x0, 4), round(y0, 4), round(x1, 4), round(y1, 4)]
 
 
+def plane_box(box: dict, unit: float) -> tuple[float, float, float, float]:
+    """A box placed in a region's plane (``x``, ``y``, ``w``, ``h`` in units of the region's height
+    from its top-left corner, like an extra region) in plane pixels (x1, y1, x2, y2)."""
+    return (box["x"] * unit, box["y"] * unit, (box["x"] + box["w"]) * unit, (box["y"] + box["h"]) * unit)
+
+
+def extra_region_image(
+    image: Image.Image, roi: dict | None, box: dict, straightened: bool = False
+) -> Image.Image | None:
+    """A reading sensor's extra region (settings.extra_region): its box cut from the plane the region
+    is read in (``reading_plane``), at the plane's own scale; None without a plane."""
+    flat = reading_plane(image, roi, straightened)
+    if flat is None:
+        return None
+    size = (max(1, round(box["w"] * flat.height)), max(1, round(box["h"] * flat.height)))
+    return flat.crop(image, plane_box(box, flat.height), size)
+
+
+def side_by_side(images: list[Image.Image], gap: int = 8) -> Image.Image:
+    """Images next to each other at the height of the first, with ``gap`` pixels between them (on
+    the neutral fill): what the reader saw of a region and its extra region, together."""
+    height = images[0].height
+    scaled = [
+        im if im.height == height else im.resize((max(1, round(im.width * height / im.height)), height))
+        for im in images
+    ]
+    out = Image.new("RGB", (sum(im.width for im in scaled) + gap * (len(scaled) - 1), height), NEUTRAL_FILL)
+    left = 0
+    for im in scaled:
+        out.paste(im.convert("RGB"), (left, 0))
+        left += im.width + gap
+    return out
+
+
 def region_image(image: Image.Image, roi: dict | None, straightened: bool = False) -> Image.Image:
     """What a reading sensor reads: its region straightened (``straightened``, four corners), or
     the region's bounding box."""

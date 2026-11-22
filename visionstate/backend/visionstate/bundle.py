@@ -129,14 +129,15 @@ def export_sensor(db: Database, storage: Storage, sensor_id: int, target: Path, 
         return f"visionstate-{sensor.slug}.zip"
 
 
-READINGS_FORMAT = 8  # readings.json; 2 added per-reading reader details, "meter", unchecked readings;
+READINGS_FORMAT = 9  # readings.json; 2 added per-reading reader details, "meter", unchecked readings;
 # 3: unchecked rejected readings too, the camera picture's size; 4: where the region is in the image;
 # 5: the wheels' "confidence_rule" ("p" as the confidence counts it; readings without it: the decoder's);
 # 6: "straightened" (the region read upright, its perspective undone, and so is the image);
 # 7: pointer dials (each dial's picture, its needle in "wheels"), "dials" in "settings" ("fraction" in
 # 0.12.0b1 only: the last wheel's tenth as one more digit); 8: "seconds" since the sensor was made (was:
 # since the export's oldest reading), "only_new", the rejected ones before the accepted ones, these spread
-# over their time when not all fit)
+# over their time when not all fit); 9: extra regions (the extra region's picture and what it read),
+# "extra_region" in "settings")
 
 READINGS_README = """Readings from a VisionState reading sensor
 ==========================================
@@ -163,6 +164,9 @@ per dial: "dials"
 lists each dial's picture as it was read (straightened, 0 at the top; "ccw": it turns
 anticlockwise), the first ×0.1 of the last wheel, and the rows of "per_wheel" after the wheels are
 the dials, with "needle" where the needle was found (null: none seen) and "certainty".
+A display with smaller last digits read from a box of their own has those digits at the end of
+"read": "extra_region" gives that box's picture as it was read (straightened like the region),
+how many digits it has and what was read in it on its own.
 "confidence_rule" says how the reading's confidence was made
 of the wheels' "p": "mean" (their geometric mean) or "weakest" (the smallest; "p" is then the
 probability that the wheel stands near that position). Readings made before VisionState 0.10.1
@@ -340,8 +344,12 @@ def export_readings(
             dial_images = [
                 imaging.encode_jpeg(flat.crop(frame, dials.dial_box(d, flat.height), size)) for d in placed if flat
             ]
+            # An extra region (settings.extra_region): its box as it was read.
+            extra_box = details.get("extra_region")
+            extra_cut = imaging.extra_region_image(frame, roi, extra_box, bool(corners)) if extra_box else None
+            extra_image = imaging.encode_jpeg(extra_cut) if extra_cut is not None else b""
             # Room for readings.json still to come: it compresses to well under a fifth.
-            weight = len(image) + sum(len(d) for d in dial_images)
+            weight = len(image) + sum(len(d) for d in dial_images) + len(extra_image)
             if items and file.tell() + weight + listed // 4 + 100_000 > budget:
                 left_out = len(ids) - place[row.id]  # full: this one and every one after it
                 break
@@ -353,6 +361,14 @@ def export_readings(
                     {"file": f"images/{len(items) + 1:04d}-dial{k + 1}.jpg", "ccw": bool(dial.get("ccw"))}
                 )
                 archive.writestr(dial_files[-1]["file"], jpeg, compress_type=zipfile.ZIP_STORED)
+            extra_file = {}
+            if extra_image and extra_box:
+                extra_file = {
+                    "file": f"images/{len(items) + 1:04d}-extra.jpg",
+                    "digits": int(extra_box["digits"]),
+                    "read": (details.get("extra") or {}).get("text"),
+                }
+                archive.writestr(extra_file["file"], extra_image, compress_type=zipfile.ZIP_STORED)
             items.append(
                 {
                     "file": name,
@@ -375,6 +391,7 @@ def export_readings(
                     "lamp": details.get("lamp"),
                     **({"wheels": details["wheels"]} if "wheels" in details else {}),
                     **({"dials": dial_files} if dial_files else {}),
+                    **({"extra_region": extra_file} if extra_file else {}),
                 }
             )
             listed += len(json.dumps(items[-1]))
@@ -396,6 +413,7 @@ def export_readings(
                     "counter_reader",
                     "decimals",
                     "dials",
+                    "extra_region",
                     "unit",
                     "max_step",
                     "change_limit",
