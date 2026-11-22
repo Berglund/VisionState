@@ -63,6 +63,32 @@ export function quadMap(points: Pt[]): ((u: number, v: number) => Pt) | null {
   };
 }
 
+/**
+ * A box placed in the plane a reading sensor's region is read in (an extra region: x, y, w, h in units
+ * of the region's height from its top-left corner) as four corners in the frame (0–1), the way the
+ * backend cuts it (imaging.reading_plane, Plane.crop): the region's four corners when it is
+ * straightened, else its bounding box. ``aspect`` is the frame's width over its height (the plane's
+ * units are pixels). Null without a region that makes an area.
+ */
+export function planeBox(
+  roi: Roi | null,
+  straightened: boolean,
+  box: { x: number; y: number; w: number; h: number },
+  aspect: number,
+): Pt[] | null {
+  if (!roi || !(aspect > 0)) return null;
+  const corners = straightened && isPolygon(roi) && toPoints(roi).length === 4 ? toPoints(roi) : rectPoints(roi);
+  const map = quadMap(corners);
+  if (!map) return null;
+  const px = corners.map(([x, y]) => [x * aspect, y]);
+  const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  // The plane's width in units of its height: the mean of its top and bottom edges over the mean of its sides.
+  const width = (dist(px[0], px[1]) + dist(px[3], px[2])) / (dist(px[0], px[3]) + dist(px[1], px[2]));
+  if (!(width > 0)) return null;
+  const at = (x: number, y: number) => map(x / width, y);
+  return [at(box.x, box.y), at(box.x + box.w, box.y), at(box.x + box.w, box.y + box.h), at(box.x, box.y + box.h)];
+}
+
 /** The bounding rectangle of a region, without polygon corners. */
 export const toRectangle = (roi: Roi): Roi => ({ x: roi.x, y: roi.y, w: roi.w, h: roi.h });
 

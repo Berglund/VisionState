@@ -529,7 +529,8 @@ it shows. They are read on their own and added after the region's digits, each o
 so leave *Digits after the decimal point* at what the big digits show (0 for whole m³). The box
 moves and straightens with the region. A reading whose box shows another number of digits than set
 is rejected (*wrong digit count*) rather than shifting every digit before it, and the reading is
-only as sure as the less sure of the two. *What the reader sees* shows the digits, then the small
+only as sure as the less sure of the two. The box is drawn on the camera picture too (Live tab, region editor), beside the region.
+*What the reader sees* shows the digits, then the small
 digits; the review queue and the Quality tab show the same picture for each stored reading.
 
 **Turning dials** — the test dial of a gas meter ("½ FOOT", "2 FEET"), the sweep hand of a water

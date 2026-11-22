@@ -6,6 +6,7 @@
   import DialsEditor from '../../lib/components/DialsEditor.svelte';
   import DigitCells from '../../lib/components/DigitCells.svelte';
   import ExtraRegionEditor from '../../lib/components/ExtraRegionEditor.svelte';
+  import ExtraRegionOutline from '../../lib/components/ExtraRegionOutline.svelte';
   import ReadingEditor from '../../lib/components/ReadingEditor.svelte';
   import ReadingPartSwitch from '../../lib/components/ReadingPartSwitch.svelte';
   import RegionButtons from '../../lib/components/RegionButtons.svelte';
@@ -132,6 +133,9 @@
           {#snippet overlay()}
             {#if reading.display === 'counter'}
               <DigitCells {roi} digits={reading.digits} whole={reading.counter_reader === 'wheels'} straightened={reading.straighten} />
+            {/if}
+            {#if extraRegionOf(reading)}
+              <ExtraRegionOutline {roi} region={extraRegionOf(reading)!} straightened={reading.straighten} />
             {/if}
           {/snippet}
         </RoiEditor>

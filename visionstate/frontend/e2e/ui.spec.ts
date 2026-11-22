@@ -880,6 +880,8 @@ test('a display with smaller last digits: a box placed on its face in Settings, 
     await request.post(`api/v1/sensors/${sensor.id}/classify`);
     await page.goto(`#/sensors/${sensor.id}/live`);
     await expect(page.locator('.value-card .value')).toHaveText('957.727 m³', { timeout: 60_000 });
+    // The Live picture shows the box too, where it is read beside the region.
+    await expect(page.getByTestId('extra-region-outline').locator('polygon')).toBeVisible();
     await page.goto(`#/sensors/${sensor.id}/settings/detect`);
     await press(page.getByTestId('edit-extra-region'), info);
     await expect(card.getByTestId('extra-region-row')).toContainText('Read 727', { timeout: 60_000 });
