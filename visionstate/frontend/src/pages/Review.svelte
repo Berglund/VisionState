@@ -9,6 +9,7 @@
   import ReadingSeen from '../lib/components/ReadingSeen.svelte';
   import ReadingVerdict from '../lib/components/ReadingVerdict.svelte';
   import SoundQuestion from '../lib/components/sound/SoundQuestion.svelte';
+  import ExtraRegionOutline from '../lib/components/ExtraRegionOutline.svelte';
   import RoiEditor from '../lib/components/RoiEditor.svelte';
   import { dateTime, pct } from '../lib/format';
   import { objectName } from '../lib/objects';
@@ -294,7 +295,13 @@
         <!-- Only the region, as large as fits: the numbers are what is checked here. -->
         {#if wholeFrame}
           <div class="frame">
-            <RoiEditor src={api.historyImageUrl(current.id)} roi={readingRoi(current, current.sensor)} />
+            <RoiEditor src={api.historyImageUrl(current.id)} roi={readingRoi(current, current.sensor)}>
+              {#snippet overlay()}
+                {#if d.extra_region}
+                  <ExtraRegionOutline roi={readingRoi(current!, current!.sensor)} region={d.extra_region} straightened={!!d.straighten} />
+                {/if}
+              {/snippet}
+            </RoiEditor>
           </div>
         {:else}
           <img class="region" src={api.historyImageUrl(current.id, 'region')} alt="The region that was read" />

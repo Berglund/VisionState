@@ -3,6 +3,7 @@
   import { api } from '../lib/api';
   import { app, shownConfidence, stateInfo, toastError, toastImported } from '../lib/app.svelte';
   import AnalysedFrame from '../lib/components/AnalysedFrame.svelte';
+  import ExtraRegionOutline from '../lib/components/ExtraRegionOutline.svelte';
   import Icon from '../lib/components/Icon.svelte';
   import LiveFrame from '../lib/components/LiveFrame.svelte';
   import LiveChips from '../lib/components/LiveChips.svelte';
@@ -13,7 +14,7 @@
   import { plural, pct } from '../lib/format';
   import { facesBusy, isObjectSensor, objectChips, objectName } from '../lib/objects';
   import { pollWhileVisible } from '../lib/poll';
-  import { isReadingSensor, readingText, readingUnit } from '../lib/reading';
+  import { extraRegionOf, isReadingSensor, readingText, readingUnit } from '../lib/reading';
   import { READING_MODE_INFO } from '../lib/ui';
   import { go, href, paths } from '../lib/router.svelte';
   import type { Sensor } from '../lib/types';
@@ -118,7 +119,12 @@
               <span class="levels"><LevelChart levels={s.sound?.levels ?? []} line={s.sound?.line ?? null} /></span>
               <span class="pill-pos"><LiveChips {...soundChips(s)} overlay /></span>
             {:else if isReadingSensor(s)}
-              <LiveFrame sensorId={s.id} roi={s.roi} cached interval={POLL.thumbnail} showLive={false} />
+              {@const extra = s.reading ? extraRegionOf(s.reading) : null}
+              <LiveFrame sensorId={s.id} roi={s.roi} cached interval={POLL.thumbnail} showLive={false}>
+                {#snippet overlay()}
+                  {#if extra}<ExtraRegionOutline roi={s.roi} region={extra} straightened={!!s.reading?.straighten} />{/if}
+                {/snippet}
+              </LiveFrame>
               <span class="pill-pos"><StatePill overlay name={readingText(s)} color="var(--c-accent)" /></span>
             {:else}
               <LiveFrame sensorId={s.id} roi={s.roi} cached interval={POLL.thumbnail} showLive={false} />

@@ -882,6 +882,10 @@ test('a display with smaller last digits: a box placed on its face in Settings, 
     await expect(page.locator('.value-card .value')).toHaveText('957.727 m³', { timeout: 60_000 });
     // The Live picture shows the box too, where it is read beside the region.
     await expect(page.getByTestId('extra-region-outline').locator('polygon')).toBeVisible();
+    // And the sensor's card on the overview.
+    await page.goto('#/');
+    const tile = page.locator('.card', { has: page.getByText('Litre meter', { exact: true }) });
+    await expect(tile.getByTestId('extra-region-outline').locator('polygon')).toBeVisible({ timeout: 30_000 });
     await page.goto(`#/sensors/${sensor.id}/settings/detect`);
     await press(page.getByTestId('edit-extra-region'), info);
     await expect(card.getByTestId('extra-region-row')).toContainText('Read 727', { timeout: 60_000 });

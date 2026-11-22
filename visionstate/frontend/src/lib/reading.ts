@@ -1,7 +1,7 @@
 // Helpers for reading sensors: how a value and its unit are shown.
 import { app } from './app.svelte';
 import { dateTime, plural } from './format';
-import type { Prediction, ReadingSettings, ReadingType, Roi, Sensor } from './types';
+import type { ExtraRegion, Prediction, ReadingSettings, ReadingType, Roi, Sensor } from './types';
 
 /** The unit of a counter's rate, and of a turning dial's flow (mqtt.rate_unit): ft³ → ft³/min, kWh → kW,
  * others per hour. A dial's "ft3" is ft³ too; a counter's rate keeps "m3/h". */
@@ -77,8 +77,10 @@ export const readingDetail = (p: Prediction) =>
     last_seen?: string;
     /** The pointer dials it was read with. */
     dials?: unknown[];
+    /** Whether its region was read straightened. */
+    straighten?: boolean;
     /** The extra region it was read with, and what that read on its own. */
-    extra_region?: unknown;
+    extra_region?: ExtraRegion;
     extra?: { text: string; score: number };
   };
 

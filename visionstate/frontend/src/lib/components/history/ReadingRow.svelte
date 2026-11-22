@@ -4,6 +4,7 @@
   import { dateTime, pct } from '../../format';
   import { REJECT_REASONS, readingDetail, readingRoi, readingUnit, repeatedNote } from '../../reading';
   import type { Prediction, Sensor } from '../../types';
+  import ExtraRegionOutline from '../ExtraRegionOutline.svelte';
   import Icon from '../Icon.svelte';
   import RoiEditor from '../RoiEditor.svelte';
 
@@ -38,7 +39,14 @@
     <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} />
   </button>
   {#if open && p.has_frame}
-    <div class="full"><RoiEditor src={api.historyImageUrl(p.id)} roi={readingRoi(p, sensor)} /></div>
+    <div class="full">
+      <RoiEditor src={api.historyImageUrl(p.id)} roi={readingRoi(p, sensor)}>
+        {#snippet overlay()}
+          {@const d = readingDetail(p)}
+          {#if d.extra_region}<ExtraRegionOutline roi={readingRoi(p, sensor)} region={d.extra_region} straightened={!!d.straighten} />{/if}
+        {/snippet}
+      </RoiEditor>
+    </div>
   {/if}
 </div>
 
